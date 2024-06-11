@@ -4,7 +4,8 @@
   "description": "Telegram bot to play audio and video in group video calls",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "login": "node login.js"
   },
   "dependencies": {
     "axios": "^0.21.1",
