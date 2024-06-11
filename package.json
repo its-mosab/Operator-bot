@@ -1,0 +1,14 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot to play audio and video in group video calls",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^0.21.1",
+    "node-telegram-bot-api": "^0.50.0",
+    "puppeteer": "^10.2.0"
+  }
+}
