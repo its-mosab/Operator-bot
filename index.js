@@ -1,98 +1,56 @@
 const TelegramBot = require('node-telegram-bot-api');
-const puppeteer = require('puppeteer');
+const { TelegramClient } = require('telegram');
+const { StringSession } = require('telegram/sessions');
 
-// رمز الوصول للبوت
-const token = '6590732454:AAH5AM2uceYDaV-EU-lAJD1BXjOkYV6J9XM';
-const bot = new TelegramBot(token, { polling: true });
+const botToken = process.env.BOT_TOKEN;
+const apiId = parseInt(process.env.API_ID);
+const apiHash = process.env.API_HASH;
 
-// معرّف الحساب المساعد
-const assistantId = '6521251646';
+const bot = new TelegramBot(botToken, { polling: true });
 
-// الاستجابة للأوامر
-bot.onText(/تشغيل (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const query = match[1];
-  bot.sendMessage(chatId, `تشغيل الصوت: ${query}`);
-  // استدعاء وظيفة لتشغيل الصوت عبر الحساب المساعد
-  await playMedia('audio', query);
-});
+// الجلسة المحفوظة المقدمة من المستخدم
+const sessionString = process.env.STRING_SESSION;
+const stringSession = new StringSession(sessionString);
 
-bot.onText(/فيديو (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const query = match[1];
-  bot.sendMessage(chatId, `تشغيل الفيديو: ${query}`);
-  // استدعاء وظيفة لتشغيل الفيديو عبر الحساب المساعد
-  await playMedia('video', query);
-});
-
-bot.onText(/المطور/, (msg) => {
-  bot.sendMessage(msg.chat.id, "مطور البوت هو: YOUR_NAME");
-});
-
-// وظيفة لتشغيل الصوت أو الفيديو باستخدام الحساب المساعد
-async function playMedia(type, query) {
-  const browser = await puppeteer.launch({ headless: false });
-  const page = await browser.newPage();
-
-  // تسجيل الدخول للحساب المساعد
-  await page.goto('https://web.telegram.org');
-
-  // إدخال رقم الهاتف
-  await page.waitForSelector('input[type="tel"]');
-  await page.type('input[type="tel"]', 'YOUR_PHONE_NUMBER');
-  await page.click('button[type="submit"]');
-
-  // انتظار رمز التحقق
-  await page.waitForSelector('input[type="text"]');
-  const code = await getCodeFromUser(); // افترض أن هذه الوظيفة تستدعي المستخدم لإدخال الرمز
-  await page.type('input[type="text"]', code);
-  await page.click('button[type="submit"]');
-
-  // تشغيل الوسائط (الصوت أو الفيديو)
-  const searchUrl = `https://www.youtube.com/results?search_query=${query}`;
-  await page.goto(searchUrl);
-  const videoLink = await page.evaluate(() => {
-    const firstVideo = document.querySelector('a#video-title');
-    return firstVideo ? firstVideo.href : null;
-  });
-
-  if (videoLink) {
-    await page.goto(videoLink);
-    if (type === 'audio') {
-      // تشغيل الصوت (يمكنك استخدام YouTube في الوضع الخلفي)
-      await page.evaluate(() => {
-        const video = document.querySelector('video');
-        if (video) video.play();
-      });
-    } else if (type === 'video') {
-      // تشغيل الفيديو
-      await page.evaluate(() => {
-        const video = document.querySelector('video');
-        if (video) video.play();
-      });
-    }
-  }
-
-  // يمكنك إضافة منطق إضافي للتحكم في الوسائط هنا
-
-  // الانتظار لفترة للسماح بتشغيل الوسائط (يمكنك تحسين هذا الجزء)
-  await new Promise(resolve => setTimeout(resolve, 30000));
-
-  await browser.close();
-}
-
-// وظيفة للحصول على رمز التحقق من المستخدم (يجب عليك تنفيذ هذه الوظيفة بنفسك)
-async function getCodeFromUser() {
-  // مثال بسيط: يمكنك استبداله بمنطق آخر للحصول على الرمز من المستخدم
-  return new Promise((resolve) => {
-    const readline = require('readline').createInterface({
-      input: process.stdin,
-      output: process.stdout
+(async () => {
+    const client = new TelegramClient(stringSession, apiId, apiHash, {
+        connectionRetries: 5,
     });
 
-    readline.question('أدخل رمز التحقق: ', (code) => {
-      readline.close();
-      resolve(code);
+    await client.start();
+    console.log('You are now connected.');
+
+    bot.onText(/\/start/, (msg) => {
+        const chatId = msg.chat.id;
+        bot.sendMessage(chatId, 'مرحباً! استخدم الأوامر لتشغيل الصوت أو الفيديو عن طريق الرد على رسالة تحتوي على فيديو أو صوت.');
     });
-  });
-}
+
+    bot.onText(/تشغيل/, async (msg) => {
+        const chatId = msg.chat.id;
+        const replyToMessage = msg.reply_to_message;
+
+        if (!replyToMessage) {
+            bot.sendMessage(chatId, 'يرجى الرد على رسالة تحتوي على فيديو أو صوت لتشغيلها.');
+            return;
+        }
+
+        if (replyToMessage.video) {
+            const videoFileId = replyToMessage.video.file_id;
+            const videoFile = await bot.getFile(videoFileId);
+            const videoFilePath = `https://api.telegram.org/file/bot${botToken}/${videoFile.file_path}`;
+
+            await client.sendMessage('me', { message: `قم بتشغيل الفيديو في المجموعة: ${chatId}\nرابط الفيديو: ${videoFilePath}` });
+            bot.sendMessage(chatId, 'تم إرسال طلب تشغيل الفيديو إلى الحساب الحقيقي.');
+        } else if (replyToMessage.audio || replyToMessage.voice) {
+            const audioFileId = replyToMessage.audio ? replyToMessage.audio.file_id : replyToMessage.voice.file_id;
+            const audioFile = await bot.getFile(audioFileId);
+            const audioFilePath = `https://api.telegram.org/file/bot${botToken}/${audioFile.file_path}`;
+
+            await client.sendMessage('me', { message: `قم بتشغيل الصوت في المجموعة: ${chatId}\nرابط الصوت: ${audioFilePath}` });
+            bot.sendMessage(chatId, 'تم إرسال طلب تشغيل الصوت إلى الحساب الحقيقي.');
+        } else {
+            bot.sendMessage(chatId, 'الرسالة التي تم الرد عليها لا تحتوي على فيديو أو صوت.');
+        }
+    });
+
+})();
