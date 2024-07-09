@@ -3,28 +3,34 @@ const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 require('dotenv').config();
 
+// تحميل معلومات البيئة
 const botToken = process.env.BOT_TOKEN;
 const apiId = parseInt(process.env.API_ID);
 const apiHash = process.env.API_HASH;
 const sessionString = process.env.STRING_SESSION;
 
+// إنشاء بوت تليجرام
 const bot = new TelegramBot(botToken, { polling: true });
 const stringSession = new StringSession(sessionString);
 
 (async () => {
     try {
+        // إنشاء عميل تليجرام
         const client = new TelegramClient(stringSession, apiId, apiHash, {
             connectionRetries: 5,
         });
 
+        // بدء العميل
         await client.start();
         console.log('You are now connected.');
 
+        // الرد على أمر /start
         bot.onText(/\/start/, (msg) => {
             const chatId = msg.chat.id;
             bot.sendMessage(chatId, 'مرحباً! استخدم الأوامر لتشغيل الصوت أو الفيديو عن طريق الرد على رسالة تحتوي على فيديو أو صوت.');
         });
 
+        // التعامل مع أمر تشغيل
         bot.onText(/تشغيل/, async (msg) => {
             const chatId = msg.chat.id;
             const replyToMessage = msg.reply_to_message;
@@ -70,4 +76,3 @@ const stringSession = new StringSession(sessionString);
         console.error('Error starting the Telegram client:', error);
     }
 })();
-
