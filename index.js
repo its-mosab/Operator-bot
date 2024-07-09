@@ -70,3 +70,4 @@ const stringSession = new StringSession(sessionString);
         console.error('Error starting the Telegram client:', error);
     }
 })();
+
